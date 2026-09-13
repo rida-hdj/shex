@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::process::Command;
@@ -5,7 +6,8 @@ use std::process::Command;
 fn main() {
     println!("welcome to shex");
     loop {
-        // display the prompt "> "
+        // display the prompt
+        let _ = get_current_dir();
         print!("> ");
         io::stdout().flush().unwrap();
 
@@ -23,27 +25,37 @@ fn main() {
 
         // split the input into arguments
         let args: Vec<&str> = input.split_whitespace().collect();
-
-        // exit
-        if args[0] == "exit" {
-            break;
+        match args[0] {
+            "exit" => break,
+            "cd" => {
+                let _ = env::set_current_dir(args[1]);
+            }
+            _ => {
+                if args[0].ends_with(".sh") {
+                    run_script(args[0]);
+                    continue;
+                } else {
+                    execute_command(&args);
+                }
+            }
         }
-
-        if args[0].ends_with(".sh") {
-            run_script(args[0]);
-            continue;
-        }
-
-        // execute commands
-        execute_command(&args);
     }
-    println!("exit");
+    println!("exited");
 }
 
 fn execute_command(args: &[&str]) {
     let mut command = Command::new(args[0]);
     command.args(&args[1..]);
-    let _ = command.status();
+    match command.status() {
+        Ok(status) => {
+            if !status.success() {
+                println!("command exited with {}", status)
+            }
+        }
+        Err(_) => {
+            println!("command '{}' not found", args[0]);
+        }
+    }
 }
 
 fn run_script(path: &str) {
@@ -64,6 +76,20 @@ fn run_script(path: &str) {
         let args: Vec<&str> = line.split_whitespace().collect();
         execute_command(&args);
     }
+}
+
+fn get_current_dir() -> std::io::Result<()> {
+    let path = env::current_dir()?;
+    let home = env::var("HOME").unwrap();
+
+    let path = path.display().to_string();
+
+    if path.starts_with(&home) {
+        println!("~{}", &path[home.len()..])
+    } else {
+        println!("{}", path)
+    }
+    Ok(())
 }
 
 // TODO: add "echo > file.txt" and split the code to multiple function
